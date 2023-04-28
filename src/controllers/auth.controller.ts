@@ -8,12 +8,13 @@ import {
     signToken,
 } from '../services/user.service';
 import redisClient from '../utils/connectRedis';
-import { emailVerificationToken, passwordResetToken, signJwt, verifyJwt } from '../utils/jwt';
+import { passwordResetToken, signJwt, verifyJwt } from '../utils/jwt';
 import AppError from '../utils/app.Error';
 import sendEmail from '../utils/mailer';
+import { responseHelper } from '../utils/responseHelper';
 
 // Exclude this fields from the response
-export const excludedFields = ['password'];
+export const excludedFields = ['password', 'verificationToken', 'passwordResetToken', 'passwordResetTokenExpiresAt'];
 
 // Cookie options
 const accessTokenCookieOptions: CookieOptions = {
@@ -50,13 +51,10 @@ export const registerHandler = async (
             password: req.body.password,
         });
 
-        // create verification token
         const verification_token = user.verificationToken;
         const url = `${req.protocol}://${req.get(
             'host'
         )}/api/v1/auth/verify-email/${verification_token}`;
-
-
 
         // send email
         await sendEmail({
@@ -64,21 +62,12 @@ export const registerHandler = async (
             to: user.email,
             subject: 'Verify your email address',
             text: `Click on this link to verify your email: ${url}`,
-
         })
 
-        res.status(201).json({
-            status: 'success',
-            data: {
-                user,
-            },
-        });
+        return responseHelper.createdSuccessResMsg(res, 'user created successfully', user);
     } catch (err: any) {
         if (err.code === 11000) {
-            return res.status(409).json({
-                status: 'fail',
-                message: 'Email already exist',
-            });
+            return responseHelper.conflictResMsg(res, 'Email already exist');
         }
         next(err);
     }
@@ -90,21 +79,20 @@ export const loginHandler = async (
     next: NextFunction
 ) => {
     try {
-        // Get the user from the collection
         const user = await findUser({ email: req.body.email });
 
-        // Check if user exist and password is correct
         if (
             !user ||
             !(await user.comparePasswords(user.password, req.body.password))
         ) {
-            return next(new AppError('Invalid email or password', 401));
+            return responseHelper.badRequestResMsg(res, 'Invalid email or password');
         }
 
-        // Create the Access and refresh Tokens
+        if (!user.verified) {
+            return responseHelper.unauthorizedResMsg(res, 'Please verify your email');
+        }
         const { access_token, refresh_token } = await signToken(user);
 
-        // Send Access Token in Cookie
         res.cookie('access_token', access_token, accessTokenCookieOptions);
         res.cookie('refresh_token', refresh_token, refreshTokenCookieOptions);
         res.cookie('logged_in', true, {
@@ -112,11 +100,7 @@ export const loginHandler = async (
             httpOnly: false,
         });
 
-        // Send Access Token
-        res.status(200).json({
-            status: 'success',
-            access_token,
-        });
+        return responseHelper.successResMsg(res, 'login successful', { access_token });
     } catch (err: any) {
         next(err);
     }
@@ -128,23 +112,17 @@ export const verifyUserEmailHandler = async (
     next: NextFunction
 ) => {
     try {
-        // Get the token from the params
         const { verification_token } = req.params;
-
-        // check if token is provided
         if (!verification_token) {
-            return next(new AppError('token not provided', 400));
+            return responseHelper.badRequestResMsg(res, 'token not provided');
         }
 
-        // find user with the token from the database
         const user = await findUser({ verificationToken: verification_token });
 
-        // check if user exist
         if (!user) {
-            return next(new AppError('Invalid token provided', 400));
+            return responseHelper.badRequestResMsg(res, 'Invalid token provided');
         }
 
-        // check if user is already verified
         if (user.verified) {
             return next(new AppError('User already verified', 400));
         }
@@ -156,13 +134,7 @@ export const verifyUserEmailHandler = async (
         // save user
         await user.save({ validateBeforeSave: false });
 
-
-        return res.status(200).json({
-            status: 'success',
-            message: 'User verified successfully',
-        });
-
-
+        return responseHelper.successResMsg(res, 'User verified successfully');
 
     } catch (err: any) {
         next(err);
@@ -181,45 +153,30 @@ export const forgotPasswordHandler = async (
 
         // check if email is provided
         if (!email) {
-            return next(new AppError('Email not provided', 400));
+            return responseHelper.badRequestResMsg(res, 'Email not provided');
         }
-
-        // find user with the email from the database
         let user = await findUser({ email: email });
 
-        // check if user exist
         if (!user) {
-            return res.status(404).json({
-                status: 'fail',
-                message: message,
-            });
+            return responseHelper.notFoundResMsg(res, message);
         }
 
-
-        // create password reset token
         const reset_token = await passwordResetToken();
         user.passwordResetToken = reset_token;
 
-        // save user
         await user.save({ validateBeforeSave: false });
 
-        // create reset url
         const reset_url = `${req.protocol}://${req.get(
             'host'
         )}/api/v1/auth/reset-password/${reset_token}`;
 
-        // send email
         await sendEmail({
             from: "abayomiogunnusi@gmail.com",
             to: user.email,
             subject: 'Password reset token',
             text: `Click on this link to reset your password: ${reset_url}`,
         })
-
-        return res.status(200).json({
-            status: 'success',
-            message: message,
-        });
+        return responseHelper.successResMsg(res, message);
 
     } catch (err: any) {
         next(err);
@@ -237,38 +194,27 @@ export const resetPasswordHandler = async (
         const { password } = req.body;
         const { reset_token } = req.params;
 
-        // check if password and reset token is provided
         if (!password || !reset_token) {
-            return next(new AppError('Password or reset token not provided', 400));
+            return responseHelper.badRequestResMsg(res, 'Password or reset token not provided');
         }
 
-        // find user with the reset token from the database
         let user = await findUser({ passwordResetToken: reset_token });
 
-        // check if user exist
         if (!user) {
-            return next(new AppError('Invalid token provided', 400));
+            return responseHelper.badRequestResMsg(res, 'Invalid token provided');
         }
 
-        // check if token has expired
         if (user.passwordResetTokenExpiresAt && user.passwordResetTokenExpiresAt.getTime() < Date.now()) {
-            return next(new AppError('Token has expired', 400));
+            return responseHelper.badRequestResMsg(res, 'Token has expired');
         }
 
-        // remove password reset token
         user.passwordResetToken = undefined;
         user.passwordResetTokenExpiresAt = null;
 
-        // set new password
         user.password = password;
 
-        // save user
         await user.save({ validateBeforeSave: false });
-
-        return res.status(200).json({
-            status: 'success',
-            message: message,
-        });
+        return responseHelper.successResMsg(res, message);
 
     } catch (err: any) {
         next(err);
@@ -302,20 +248,23 @@ export const refreshAccessTokenHandler = async (
         );
         const message = 'Could not refresh access token';
         if (!decoded) {
-            return next(new AppError(message, 403));
+            // return next(new AppError(message, 403));
+            return responseHelper.unauthorizedResMsg(res, message);
         }
 
         // Check if the user has a valid session
         const session = await redisClient.get(decoded.sub);
         if (!session) {
-            return next(new AppError(message, 403));
+            // return next(new AppError(message, 403));
+            return responseHelper.unauthorizedResMsg(res, message);
         }
 
         // Check if the user exist
         const user = await findUserById(JSON.parse(session)._id);
 
         if (!user) {
-            return next(new AppError(message, 403));
+            // return next(new AppError(message, 403));
+            return responseHelper.unauthorizedResMsg(res, message);
         }
 
         // Sign new access token
@@ -331,10 +280,11 @@ export const refreshAccessTokenHandler = async (
         });
 
         // Send response
-        res.status(200).json({
-            status: 'success',
-            access_token,
-        });
+        // res.status(200).json({
+        //     status: 'success',
+        //     access_token,
+        // });
+        return responseHelper.successResMsg(res, 'Access token refreshed successfully', { access_token });
     } catch (err: any) {
         next(err);
     }

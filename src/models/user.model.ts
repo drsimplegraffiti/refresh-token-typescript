@@ -1,5 +1,6 @@
 import {
     DocumentType,
+    Severity,
     getModelForClass,
     index,
     modelOptions,
@@ -10,21 +11,19 @@ import bcrypt from 'bcryptjs';
 import { emailVerificationToken } from '../utils/jwt';
 
 @index({ email: 1 })
-@pre<User>('save', async function () {
-    // Hash password if the password is new or was updated
+    @pre<User>('save', async function () {
     if (!this.isModified('password')) return;
-
-    // Hash password with costFactor of 12
     this.password = await bcrypt.hash(this.password, 12);
 })
 @modelOptions({
     schemaOptions: {
-        // Add createdAt and updatedAt fields
         timestamps: true,
+    },
+    options: {
+        allowMixed: Severity.ALLOW,
     },
 })
 
-// Export the User class to be used as TypeScript type
 export class User {
     @prop()
     name: string;
@@ -50,12 +49,10 @@ export class User {
     @prop({ default: null })
     passwordResetTokenExpiresAt: Date  | null;
 
-    // Instance method to check if passwords match
     async comparePasswords(hashedPassword: string, candidatePassword: string) {
         return await bcrypt.compare(candidatePassword, hashedPassword);
     }
 }
 
-// Create the user model from the User class
 const userModel = getModelForClass(User);
 export default userModel;

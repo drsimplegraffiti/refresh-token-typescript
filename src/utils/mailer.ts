@@ -28,9 +28,6 @@ async function sendEmail(payload: SendMailOptions) {
             log.error(err, "Error sending email");
             return;
         }
-
-        // log.info(`Preview URL: ${nodemailer.getTestMessageUrl(info)}`);
-
     });
 }
 
