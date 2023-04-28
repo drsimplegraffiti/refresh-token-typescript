@@ -1,4 +1,5 @@
 import { createClient } from 'redis';
+import log from './logger';
 
 const redisUrl = `redis://localhost:6379`;
 const redisClient = createClient({
@@ -8,9 +9,9 @@ const redisClient = createClient({
 const connectRedis = async () => {
     try {
         await redisClient.connect();
-        console.log('Redis client connected...');
+        log.info('Redis client connected...');
     } catch (err: any) {
-        console.log(err.message);
+        log.info(err.message);
         setTimeout(connectRedis, 5000);
     }
 };

@@ -7,6 +7,7 @@ import {
     prop,
 } from '@typegoose/typegoose';
 import bcrypt from 'bcryptjs';
+import { emailVerificationToken } from '../utils/jwt';
 
 @index({ email: 1 })
 @pre<User>('save', async function () {
@@ -36,6 +37,18 @@ export class User {
 
     @prop({ default: 'user' })
     role: string;
+
+    @prop({ default: false })
+    verified: boolean;
+
+    @prop({ required: true, default: () => emailVerificationToken() })
+    verificationToken: string | undefined;
+
+    @prop({ default: undefined })
+    passwordResetToken: string | undefined;
+
+    @prop({ default: null })
+    passwordResetTokenExpiresAt: Date  | null;
 
     // Instance method to check if passwords match
     async comparePasswords(hashedPassword: string, candidatePassword: string) {

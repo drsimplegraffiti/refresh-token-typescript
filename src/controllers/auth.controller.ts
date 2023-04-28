@@ -8,8 +8,9 @@ import {
     signToken,
 } from '../services/user.service';
 import redisClient from '../utils/connectRedis';
-import { signJwt, verifyJwt } from '../utils/jwt';
+import { emailVerificationToken, passwordResetToken, signJwt, verifyJwt } from '../utils/jwt';
 import AppError from '../utils/app.Error';
+import sendEmail from '../utils/mailer';
 
 // Exclude this fields from the response
 export const excludedFields = ['password'];
@@ -48,6 +49,23 @@ export const registerHandler = async (
             name: req.body.name,
             password: req.body.password,
         });
+
+        // create verification token
+        const verification_token = user.verificationToken;
+        const url = `${req.protocol}://${req.get(
+            'host'
+        )}/api/v1/auth/verify-email/${verification_token}`;
+
+
+
+        // send email
+        await sendEmail({
+            from: "abayomiogunnusi@gmail.com",
+            to: user.email,
+            subject: 'Verify your email address',
+            text: `Click on this link to verify your email: ${url}`,
+
+        })
 
         res.status(201).json({
             status: 'success',
@@ -103,6 +121,161 @@ export const loginHandler = async (
         next(err);
     }
 };
+
+export const verifyUserEmailHandler = async (
+    req: Request,
+    res: Response,
+    next: NextFunction
+) => {
+    try {
+        // Get the token from the params
+        const { verification_token } = req.params;
+
+        // check if token is provided
+        if (!verification_token) {
+            return next(new AppError('token not provided', 400));
+        }
+
+        // find user with the token from the database
+        const user = await findUser({ verificationToken: verification_token });
+
+        // check if user exist
+        if (!user) {
+            return next(new AppError('Invalid token provided', 400));
+        }
+
+        // check if user is already verified
+        if (user.verified) {
+            return next(new AppError('User already verified', 400));
+        }
+
+        // verify user
+        user.verified = true;
+        user.verificationToken = undefined;
+
+        // save user
+        await user.save({ validateBeforeSave: false });
+
+
+        return res.status(200).json({
+            status: 'success',
+            message: 'User verified successfully',
+        });
+
+
+
+    } catch (err: any) {
+        next(err);
+    }
+};
+
+// forgot password handler
+export const forgotPasswordHandler = async (
+    req: Request,
+    res: Response,
+    next: NextFunction
+) => {
+    try {
+        const message = "If a user with this email exists, you will receive a password reset link shortly";
+        const { email } = req.body;
+
+        // check if email is provided
+        if (!email) {
+            return next(new AppError('Email not provided', 400));
+        }
+
+        // find user with the email from the database
+        let user = await findUser({ email: email });
+
+        // check if user exist
+        if (!user) {
+            return res.status(404).json({
+                status: 'fail',
+                message: message,
+            });
+        }
+
+
+        // create password reset token
+        const reset_token = await passwordResetToken();
+        user.passwordResetToken = reset_token;
+
+        // save user
+        await user.save({ validateBeforeSave: false });
+
+        // create reset url
+        const reset_url = `${req.protocol}://${req.get(
+            'host'
+        )}/api/v1/auth/reset-password/${reset_token}`;
+
+        // send email
+        await sendEmail({
+            from: "abayomiogunnusi@gmail.com",
+            to: user.email,
+            subject: 'Password reset token',
+            text: `Click on this link to reset your password: ${reset_url}`,
+        })
+
+        return res.status(200).json({
+            status: 'success',
+            message: message,
+        });
+
+    } catch (err: any) {
+        next(err);
+    }
+};
+
+// reset password handler
+export const resetPasswordHandler = async (
+    req: Request,
+    res: Response,
+    next: NextFunction
+) => {
+    try {
+        const message = "Password reset successful";
+        const { password } = req.body;
+        const { reset_token } = req.params;
+
+        // check if password and reset token is provided
+        if (!password || !reset_token) {
+            return next(new AppError('Password or reset token not provided', 400));
+        }
+
+        // find user with the reset token from the database
+        let user = await findUser({ passwordResetToken: reset_token });
+
+        // check if user exist
+        if (!user) {
+            return next(new AppError('Invalid token provided', 400));
+        }
+
+        // check if token has expired
+        if (user.passwordResetTokenExpiresAt && user.passwordResetTokenExpiresAt.getTime() < Date.now()) {
+            return next(new AppError('Token has expired', 400));
+        }
+
+        // remove password reset token
+        user.passwordResetToken = undefined;
+        user.passwordResetTokenExpiresAt = null;
+
+        // set new password
+        user.password = password;
+
+        // save user
+        await user.save({ validateBeforeSave: false });
+
+        return res.status(200).json({
+            status: 'success',
+            message: message,
+        });
+
+    } catch (err: any) {
+        next(err);
+    }
+};
+
+
 
 // Refresh tokens
 const logout = (res: Response) => {

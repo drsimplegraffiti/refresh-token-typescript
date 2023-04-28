@@ -1,5 +1,6 @@
 import mongoose from 'mongoose';
 import config from 'config';
+import log from './logger';
 
 const dbUrl = `mongodb://${config.get('dbName')}:${config.get(
     'dbPass'
@@ -9,9 +10,9 @@ mongoose.set('strictQuery', true)
 const connectDB = async () => {
     try {
         await mongoose.connect(dbUrl);
-        console.log('Database connected...');
+        log.info('Database connected...');
     } catch (error: any) {
-        console.log(error.message);
+        log.error(error.message);
         setTimeout(connectDB, 5000);
     }
 };

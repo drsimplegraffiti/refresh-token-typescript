@@ -1,4 +1,5 @@
 import jwt, { SignOptions } from 'jsonwebtoken';
+import crypto from 'crypto';
 import config from 'config';
 
 export const signJwt = (
@@ -27,4 +28,13 @@ export const verifyJwt = <T>(
     } catch (error) {
         return null;
     }
+};
+
+
+export const emailVerificationToken = () => {
+    return crypto.randomBytes(32).toString('hex');
+};
+
+export const passwordResetToken = () => {
+    return crypto.randomBytes(32).toString('hex');
 };

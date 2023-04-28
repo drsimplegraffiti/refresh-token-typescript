@@ -28,5 +28,38 @@ export const loginUserSchema = object({
     }),
 });
 
+export const verifyEmailSchema = object({
+    params: object({
+        verification_token: string({ required_error: 'Token is required' }),
+    }),
+});
+
+export const forgotPasswordSchema = object({
+    body: object({
+        email: string({
+            required_error: 'Email is required',
+        }).email('Not a valid email'),
+    }),
+});
+
+export const resetPasswordSchema = object({
+    params: object({
+        reset_token: string({ required_error: 'Token is required' }),
+    }),
+    body: object({
+        password: string({ required_error: 'Password is required' })
+            .min(8, 'Password must be more than 8 characters')
+            .max(32, 'Password must be less than 32 characters'),
+        passwordConfirm: string({ required_error: 'Please confirm your password' }),
+    }).refine((data) => data.password === data.passwordConfirm, {
+        path: ['passwordConfirm'],
+        message: 'Passwords do not match',
+    }),
+});
+
+
 export type CreateUserInput = TypeOf<typeof createUserSchema>['body'];
 export type LoginUserInput = TypeOf<typeof loginUserSchema>['body'];
+export type VerifyEmailInput = TypeOf<typeof verifyEmailSchema>['params'];
+export type ForgotPasswordInput = TypeOf<typeof forgotPasswordSchema>['body'];
+export type ResetPasswordInput = TypeOf<typeof resetPasswordSchema>['body'] & TypeOf<typeof resetPasswordSchema>['params'];
