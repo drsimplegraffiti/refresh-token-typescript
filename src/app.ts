@@ -8,6 +8,10 @@ import connectDB from './utils/connectDB';
 import userRouter from './routes/user.routes';
 import authRouter from './routes/auth.routes';
 import log from './utils/logger';
+import validateEnv from './utils/validateEnv';
+
+
+validateEnv();
 
 const app = express();
 
@@ -66,6 +70,5 @@ app.use((err: any, req: Request, res: Response, next: NextFunction) => {
 const port = config.get<number>('port');
 app.listen(port, () => {
     log.info(`Server started on port: ${port}`);
-    // 👇 call the connectDB function here
     connectDB();
 });
