@@ -47,7 +47,13 @@ export class User {
     passwordResetToken: string | undefined;
 
     @prop({ default: null })
-    passwordResetTokenExpiresAt: Date  | null;
+    passwordResetTokenExpiresAt: Date | null;
+
+    @prop({ default: null })
+    passwordChangedAt: Date | null;
+
+    @prop()
+    profilePicture: string;
 
     async comparePasswords(hashedPassword: string, candidatePassword: string) {
         return await bcrypt.compare(candidatePassword, hashedPassword);

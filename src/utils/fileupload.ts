@@ -1,17 +1,42 @@
-import multer from "multer";
+import multer from 'multer';
+import { v2 as cloudinary } from 'cloudinary';
+import config from "config";
+import { Request } from 'express';
 
-const upload = multer({
-    limits: {
-        fileSize: 2000000,
-    },
-    fileFilter(req, file, cb) {
-        if (!file.originalname.match(/\.(png|jpg|jpeg)$/)) {
-            return cb(
-                new Error("Please upload an image with png, jpg or jpeg format")
-            );
-        }
-        cb(null, true);
-    },
+cloudinary.config({
+    cloud_name: config.get("cloudinary.cloud_name"),
+    api_key: config.get("cloudinary.api_key"),
+    api_secret: config.get("cloudinary.api_secret")
 });
 
-export default upload;
+const storage = multer.diskStorage({
+    filename: function (req, file, cb) {
+        cb(null, file.originalname);
+    },
+    destination: function (req, file, cb) {
+        cb(null, 'uploads/');
+    }
+});
+
+const fileFilter = (req: Request, file: any, cb: any) => {
+    if (file.mimetype === 'image/jpeg' || file.mimetype === 'image/png') {
+        // accept file
+        cb(null, true);
+    } else {
+        // reject file
+        cb(null, false);
+    }
+};
+
+const upload = multer({
+    storage: storage,
+    fileFilter: fileFilter,
+    limits: {
+        fileSize: 1024 * 1024 * 5 // 5MB
+    }
+});
+
+export {
+    upload,
+    cloudinary
+};

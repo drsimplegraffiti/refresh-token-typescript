@@ -57,9 +57,21 @@ export const resetPasswordSchema = object({
     }),
 });
 
+// name?, profilePicture, role
+export const updateUserSchema = object({
+    body: object({
+        name: string(),
+        profilePicture: string({ required_error: 'Profile picture is required' }), // coming from req.file.path
+        role: string(),
+    }),
+});
+
+
+
 
 export type CreateUserInput = TypeOf<typeof createUserSchema>['body'];
 export type LoginUserInput = TypeOf<typeof loginUserSchema>['body'];
 export type VerifyEmailInput = TypeOf<typeof verifyEmailSchema>['params'];
 export type ForgotPasswordInput = TypeOf<typeof forgotPasswordSchema>['body'];
 export type ResetPasswordInput = TypeOf<typeof resetPasswordSchema>['body'] & TypeOf<typeof resetPasswordSchema>['params'];
+export type UpdateUserInput = TypeOf<typeof updateUserSchema>['body'];

@@ -12,9 +12,12 @@ import { passwordResetToken, signJwt, verifyJwt } from '../utils/jwt';
 import AppError from '../utils/app.Error';
 import sendEmail from '../utils/mailer';
 import { responseHelper } from '../utils/responseHelper';
+import { cloudinary } from '../utils/fileupload';
+import log from '../utils/logger';
+
 
 // Exclude this fields from the response
-export const excludedFields = ['password', 'verificationToken', 'passwordResetToken', 'passwordResetTokenExpiresAt'];
+export const excludedFields = ['password', 'passwordResetToken', 'passwordResetTokenExpiresAt'];
 
 // Cookie options
 const accessTokenCookieOptions: CookieOptions = {
@@ -50,7 +53,6 @@ export const registerHandler = async (
             name: req.body.name,
             password: req.body.password,
         });
-
         const verification_token = user.verificationToken;
         const url = `${req.protocol}://${req.get(
             'host'
@@ -278,12 +280,6 @@ export const refreshAccessTokenHandler = async (
             ...accessTokenCookieOptions,
             httpOnly: false,
         });
-
-        // Send response
-        // res.status(200).json({
-        //     status: 'success',
-        //     access_token,
-        // });
         return responseHelper.successResMsg(res, 'Access token refreshed successfully', { access_token });
     } catch (err: any) {
         next(err);
@@ -301,6 +297,47 @@ export const logoutHandler = async (
         logout(res);
         return res.status(200).json({ status: 'success' });
     } catch (err: any) {
+        next(err);
+    }
+};
+
+interface FileWithMetadata extends Express.Multer.File {
+    path: string;
+}
+
+// update user profile with image
+export const updateUserProfileHandler = async (
+    req: Request,
+    res: Response,
+    next: NextFunction
+) => {
+    try {
+        const user = res.locals.user;
+
+        // get the image from req.file
+        const image = req.file as FileWithMetadata;
+
+        if (!image) {
+            return responseHelper.badRequestResMsg(res, 'Image not provided');
+        }
+
+        const result = await cloudinary.uploader.upload(image.path);
+
+        // find user and update profile
+        const foundUser = await findUser({ _id: user._id })
+
+        if (!foundUser) {
+            return responseHelper.notFoundResMsg(res, 'User not found');
+        }
+
+        foundUser.profilePicture = result.secure_url;
+
+         await foundUser.save({ validateBeforeSave: false});
+
+        return responseHelper.successResMsg(res, 'Profile updated successfully', { profile: user.profile });
+
+    } catch (err: any) {
+        log.error(err);
         next(err);
     }
 };

@@ -141,3 +141,21 @@ Response
     "message": "You are not allowed to perform this action"
 }
 ```
+
+Including the JSON file exported from Postman as part of your application file can bring numerous benefits. 
+
+Firstly, it ensures consistency in API testing across different environments. 
+
+Secondly, it saves time by eliminating the need to manually recreate requests and collections. 
+
+Thirdly, it enables easy sharing of APIs with team members and clients. 
+
+Fourthly, it facilitates automation of API testing and integration with other tools. 
+
+Lastly, it helps in tracking changes and versioning of APIs. 
+
+In summary, adding the Postman JSON file to your application file can enhance productivity, collaboration, and quality assurance.
+
+"The video below demos the above benefits and shows how to export the Postman collection as a JSON file and add it to your application for improved API testing and collaboration."
+
+#APItesting #Postman #JSONfile #productivity #collaboration #automation #qualityassurance #devops #softwaredevelopment #applicationdevelopment

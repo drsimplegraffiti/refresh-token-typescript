@@ -35,6 +35,7 @@ router.post('/reset-password/:reset_token', validate(resetPasswordSchema), reset
 router.get('/refresh', refreshAccessTokenHandler);
 
 
+
 router.use(deserializeUser, requireUser);
 
 // Logout User

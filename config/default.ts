@@ -10,5 +10,10 @@ export default {
         host: 'sandbox.smtp.mailtrap.io',
         port: 465,
         secure: false
-    }
+    },
+    cloudinary: {
+        cloud_name: 'drsimple',
+        api_key: '934959128785944',
+        api_secret: 'sCnORU-HS1oDaFMuG8EPIvUpKkI',
+    },
 };
